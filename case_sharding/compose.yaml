@@ -1,10 +1,75 @@
+name: case-sharding
 services:
-  mongodb1:
-    container_name: mongodb1
-    image: dh-mirror.gitverse.ru/mongo:latest
+  configSrv:
+    image: mongo:latest
+    container_name: configSrv
+    ports:
+      - 27017:27017
+    networks:
+      app-network:
     volumes:
-      - mongodb1_data_container:/data/db
-
+      - config_data_container:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+  shard1:
+    image: mongo:latest
+    container_name: shard1
+    ports:
+      - 27018:27018
+    networks:
+      app-network:
+    volumes:
+      - shard1_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1", 
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+  shard2:
+    image: mongo:latest
+    container_name: shard2
+    ports:
+      - 27019:27019
+    networks:
+      app-network:
+    volumes:
+      - shard2_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2", 
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+  mongos_router:
+    image: mongo:latest
+    container_name: mongos_router
+    ports:
+      - 27020:27020
+    networks:
+      app-network:
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/configSrv:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
   pymongo_api:
     container_name: pymongo_api
     build: 
@@ -12,13 +77,24 @@ services:
       dockerfile: Dockerfile
     image: kazhem/pymongo_api:1.0.0
     depends_on:
-      - mongodb1
+      - mongos_router
     ports:
       - 8080:8080
+    networks:
+      - app-network
     environment:
-      MONGODB_URL: "mongodb://mongodb1"
+      MONGODB_URL: "mongodb://mongos_router:27020"
       MONGODB_DATABASE_NAME: "somedb"
-
+  
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.17.0.0/16
 
 volumes:
-  mongodb1_data_container:
+  config_data_container:
+  shard1_data_container:
+  shard2_data_container:
