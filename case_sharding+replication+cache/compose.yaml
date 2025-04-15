@@ -1,0 +1,188 @@
+name: case-sharding+replication
+services:
+  configSrv:
+    image: mongo:latest
+    container_name: configSrv
+    ports:
+      - 27017:27017
+    networks:
+      app-network:
+    volumes:
+      - config_data_container:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+  shard1-1:
+    image: mongo:latest
+    container_name: shard1-1
+    ports:
+      - 27018:27018
+    networks:
+      app-network:
+    volumes:
+      - shard1-1_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs1", 
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+  shard1-2:
+    image: mongo:latest
+    container_name: shard1-2
+    ports:
+      - 27021:27021
+    networks:
+      app-network:
+    volumes:
+      - shard1-2_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs1", 
+        "--bind_ip_all",
+        "--port",
+        "27021"
+      ]
+  shard1-3:
+    image: mongo:latest
+    container_name: shard1-3
+    ports:
+      - 27022:27022
+    networks:
+      app-network:
+    volumes:
+      - shard1-3_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs1", 
+        "--bind_ip_all",
+        "--port",
+        "27022"
+      ]
+  shard2-1:
+    image: mongo:latest
+    container_name: shard2-1
+    ports:
+      - 27019:27019
+    networks:
+      app-network:
+    volumes:
+      - shard2-1_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs2", 
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+  shard2-2:
+    image: mongo:latest
+    container_name: shard2-2
+    ports:
+      - 27023:27023
+    networks:
+      app-network:
+    volumes:
+      - shard2-2_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs2", 
+        "--bind_ip_all",
+        "--port",
+        "27023"
+      ]
+  shard2-3:
+    image: mongo:latest
+    container_name: shard2-3
+    ports:
+      - 27024:27024
+    networks:
+      app-network:
+    volumes:
+      - shard2-3_data_container:/data/db
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "rs2", 
+        "--bind_ip_all",
+        "--port",
+        "27024"
+      ]
+  mongos_router:
+    image: mongo:latest
+    container_name: mongos_router
+    ports:
+      - 27020:27020
+    networks:
+      app-network:
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/configSrv:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
+    depends_on:
+      - configSrv
+      - shard1-1
+      - shard2-1
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+  pymongo_api:
+    container_name: pymongo_api
+    build: 
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    depends_on:
+      - mongos_router
+    ports:
+      - 8080:8080
+    networks:
+      - app-network
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://redis:6379"
+  
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.17.0.0/16
+
+volumes:
+  config_data_container:
+  shard1-1_data_container:
+  shard1-2_data_container:
+  shard1-3_data_container:
+  shard2-1_data_container:
+  shard2-2_data_container:
+  shard2-3_data_container:
