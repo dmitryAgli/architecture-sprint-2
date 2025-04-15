@@ -1,4 +1,4 @@
-name: case-sharding+replication
+name: sharding-repl-cache
 services:
   configSrv:
     image: mongo:latest
